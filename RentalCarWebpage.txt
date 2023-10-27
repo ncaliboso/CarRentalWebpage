@@ -1,0 +1,261 @@
+Public Class WebForm1
+    Inherits System.Web.UI.Page
+    'This is a global dimenion that defines dtRentalInvoices as a datatable and gtotal rentals as the total number of rentals
+    Public Shared dtRentalInvoices As New DataTable
+    Public Shared gtotalrentals As Integer
+    Public Shared SedanTransactions As Integer
+    Public Shared TruckTransactions As Integer
+    Public Shared VanTransactions As Integer
+    Public Shared gdtindrecords, gdtvehicletotal, gdtgrandtotal, gdtIDtotal As New DataTable
+
+#Region "INIT"
+    Private Sub WebForm1_Init(sender As Object, e As EventArgs) Handles Me.Init
+        'This only allows the data table to be created once
+        If dtRentalInvoices.Columns.Count > 0 Then Exit Sub
+
+        'This creates each column name and defines their dimension
+        With dtRentalInvoices.Columns
+            .Add("ReservationID", GetType(Integer))
+            .Add("EmployeeName", GetType(String))
+            .Add("RentalVehicle", GetType(String))
+            .Add("DateCheckedOut", GetType(String))
+            .Add("StartingMileage", GetType(Decimal))
+            .Add("DateReturned", GetType(String))
+            .Add("EndingMileage", GetType(Decimal))
+            .Add("MilesDriven", GetType(Decimal))
+            .Add("RentalPrice", GetType(Decimal))
+            .Add("DamagesandCleaning", GetType(Decimal))
+            .Add("DayofWeek", GetType(String))
+        End With
+
+        'This makes it so each new row that is added increments by one
+        With dtRentalInvoices.Columns("ReservationID")
+            .AutoIncrement = True
+            .AutoIncrementSeed = 1
+            .AutoIncrementStep = 1
+        End With
+
+        'This only allows this table to be created once
+        If gdtvehicletotal.Columns.Count > 0 Then Exit Sub
+
+        'This creates the data table for the vehicle totals
+        With gdtvehicletotal
+            .Columns.Add("VehicleType", GetType(String))
+            .Columns.Add("#ofRentals", GetType(Integer))
+            .Columns.Add("%Total", GetType(String))
+            .Columns.Add("TotalMiles", GetType(Decimal))
+            .Columns.Add("TotalRevenue", GetType(Decimal))
+
+            .Columns("#ofRentals").DefaultValue = 0
+            .Columns("TotalRevenue").DefaultValue = 0
+        End With
+
+        For Each Vehicle As ListItem In ddlType.Items
+            Dim dr2 As DataRow = gdtvehicletotal.NewRow
+            dr2.Item("VehicleType") = Vehicle.Text
+            gdtvehicletotal.Rows.Add(dr2)
+        Next
+
+        GridView2.DataSource = gdtvehicletotal
+        GridView2.DataBind()
+
+        'Only creats the grand total data table once
+        If gdtgrandtotal.Columns.Count > 0 Then Exit Sub
+
+        'Give column names to Grand Total Data Table
+        With gdtgrandtotal
+            .Columns.Add("#ofRentals", GetType(Integer))
+            .Columns.Add("TotalMiles", GetType(Decimal))
+            .Columns.Add("TotalRevenue", GetType(Decimal))
+
+            .Columns("TotalMiles").DefaultValue = 0
+            .Columns("#ofRentals").DefaultValue = 0
+            .Columns("TotalRevenue").DefaultValue = 0
+        End With
+
+        Dim drGrandTotals As DataRow = gdtgrandtotal.NewRow
+        gdtgrandtotal.Rows.Add(drGrandTotals)
+
+        GridView3.DataSource = gdtgrandtotal
+        GridView1.DataBind()
+
+        'Table can only be created once
+        If gdtIDtotal.Columns.Count > 0 Then Exit Sub
+
+        'Gives column names to Vehicle ID data table
+        With gdtIDtotal
+            .Columns.Add("VehicleID", GetType(String))
+            .Columns.Add("#ofRentals", GetType(Integer))
+            .Columns.Add("TotalMiles", GetType(Decimal))
+            .Columns.Add("TotalRevenue", GetType(Decimal))
+
+            .Columns("#ofRentals").DefaultValue = 0
+            .Columns("TotalRevenue").DefaultValue = 0
+        End With
+
+        For Each Vehicle As ListItem In ddlID.Items
+            Dim dr2 As DataRow = gdtIDtotal.NewRow
+            dr2.Item("VehicleID") = Vehicle.Text
+            gdtIDtotal.Rows.Add(dr2)
+        Next
+
+        GridView4.DataSource = gdtgrandtotal
+        GridView1.DataBind()
+
+    End Sub
+#End Region
+
+#Region "btn"
+    Protected Sub btnEnter_Click(sender As Object, e As EventArgs) Handles btnEnter.Click
+        'Error checking so all inputs are filled out correctly
+        If txtName.Text = Nothing OrElse txtCheck.Text = Nothing OrElse txtMile1.Text = Nothing OrElse IsNumeric(txtMile1.Text) = False OrElse txtRet.Text = Nothing OrElse txtMile2.Text = Nothing OrElse IsNumeric(txtMile2.Text) = False Then
+            txtOutput.Text = "Please review data entry."
+            Exit Sub
+        End If
+        'Error checking that doesnt allow the ending mileage to be less that the beginning mileage
+        If txtMile2.Text < txtMile1.Text Then
+            txtOutput.Text = "Double check your milage input."
+            Exit Sub
+        End If
+
+        'Keeps track of the total number of rentals
+        gtotalrentals += 1
+
+        'The local dimensions for the total costs and dates
+        Dim dr As DataRow = dtRentalInvoices.NewRow
+        Dim DateCheckedOut As Date = DateTime.Parse(txtCheck.Text)
+        Dim datereturned As Date = DateTime.Parse(txtRet.Text)
+        Dim dectotal As Decimal
+        Dim miletotal As Decimal
+        Dim cartotal As Decimal
+        Dim ts As TimeSpan = datereturned - DateCheckedOut
+        Dim dateRental As Date = DateTime.Parse(txtCheck.Text)
+        Dim DC As Decimal
+        Dim totalmiles As Decimal
+
+        'The calculations of the total mileage cost, daily vehicle rental cost, and total cost for the rental
+        miletotal = (txtMile2.Text - txtMile1.Text) * 0.25
+        cartotal = ddlType.SelectedValue * ts.TotalDays
+        dectotal = dectotal + miletotal + cartotal
+        totalmiles = (txtMile2.Text - txtMile1.Text)
+
+        'If the car was damaged or needs cleaning, this adds the cost to the total cost
+        For Each selecteditem In chkDam.Items
+            If selecteditem.selected = True Then
+                dectotal += selecteditem.value
+                DC += selecteditem.value
+            End If
+        Next
+
+        For Each selecteditem In chkClean.Items
+            If selecteditem.selected = True Then
+                dectotal += selecteditem.value
+                DC += selecteditem.value
+            End If
+        Next
+
+        'The output box for each invoice input with all the details of the rental
+        txtOutput.Text = DateTime.Now.ToLongDateString & vbNewLine & vbNewLine & "Employee: " & txtName.Text & vbNewLine & "Vehicle: " & ddlType.SelectedItem.Text & vbNewLine & "Total Days of Use: " & ts.TotalDays & vbNewLine & "Total Cost: " & FormatCurrency(dectotal) & vbNewLine & vbNewLine & "Total Rentals: " & gtotalrentals
+
+        'DECTOTAL AND OUTPUT
+
+        'Calculates what to input into each column for each invoice
+        dr.Item("RentalPrice") = (ddlType.SelectedValue * ts.TotalDays)
+        dr.Item("DamagesandCleaning") = DC
+        dr.Item("RentalVehicle") = ddlType.SelectedItem.Text
+        dr.Item("DateCheckedOut") = DateTime.Parse(txtCheck.Text)
+        dr.Item("DateReturned") = DateTime.Parse(txtRet.Text)
+        dr.Item("StartingMileage") = txtMile1.Text
+        dr.Item("EndingMileage") = txtMile2.Text
+        dr.Item("MilesDriven") = (txtMile2.Text - txtMile1.Text)
+        dr.Item("EmployeeName") = txtName.Text
+        dr.Item("DayofWeek") = dateRental.ToString("dddd")
+
+
+        'Inputs the columns into the Gridview data table
+        dtRentalInvoices.Rows.Add(dr)
+        GridView1.DataSource = dtRentalInvoices
+        GridView1.DataBind()
+
+
+        'This keeps a running total of every variable for all three new data tables
+        With gdtvehicletotal.Rows(ddlType.SelectedIndex)
+            .Item("#ofRentals") += 1
+            .Item("TotalMiles") = totalmiles
+            .Item("TotalRevenue") += dectotal
+        End With
+
+
+        With gdtgrandtotal.Rows(0)
+            .Item("#ofRentals") += 1
+            .Item("TotalMiles") += totalmiles
+            .Item("TotalRevenue") += dectotal
+        End With
+
+        For Each drow As DataRow In gdtvehicletotal.Rows
+            drow("%Total") = FormatPercent(drow("TotalRevenue") / gdtgrandtotal.Rows(0).Item("TotalRevenue"))
+        Next
+
+        With gdtIDtotal.Rows(ddlID.SelectedIndex)
+            .Item("#ofRentals") += 1
+            .Item("TotalMiles") = totalmiles
+            .Item("TotalRevenue") += dectotal
+        End With
+
+        GridView2.DataSource = gdtvehicletotal
+        GridView2.DataBind()
+
+
+        GridView3.DataSource = gdtgrandtotal
+        GridView3.DataBind()
+
+        GridView4.DataSource = gdtIDtotal
+        GridView4.DataBind()
+
+
+    End Sub
+#End Region
+    Protected Sub Page_Load(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
+
+
+
+
+    End Sub
+
+#Region "Clear"
+
+    'This clear button clears all of the inputs and the output text box
+    Protected Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
+        txtCheck.Text = Nothing
+        txtRet.Text = Nothing
+        chkClean.SelectedIndex = -1
+        chkDam.SelectedIndex = -1
+        txtOutput.Text = Nothing
+        txtMile1.Text = Nothing
+        txtMile2.Text = Nothing
+        txtName.Text = Nothing
+        ddlID.SelectedIndex = 0
+
+    End Sub
+#End Region
+
+#Region "Pictures"
+
+
+    'This is an added feature that displays an image of which vehicle type was chosen
+    Protected Sub ddlType_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ddlType.SelectedIndexChanged
+
+        Select Case ddlType.SelectedIndex
+            Case 0
+                Image1.ImageUrl = "sedan.png"
+            Case 1
+                Image1.ImageUrl = "van.png"
+            Case 2
+                Image1.ImageUrl = "truck.png"
+        End Select
+
+    End Sub
+#End Region
+
+
+End Class
