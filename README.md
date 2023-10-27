@@ -1,1 +1,1 @@
-# CarRentalWebpage
+This car rental Visual Basic .NET web application (using SQL query) is designed to handle car rental invoices. The aim is to have users submit details about their rentals and returns of vehicles within fleet, which are then logged into database, recording and calculating different values. The data displayed on webpage include individual invoices, total rental data, individual vehicle type data, and individual vehicle ID data.
